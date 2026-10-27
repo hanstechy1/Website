@@ -1,12 +1,10 @@
 <!DOCTYPE html>
-<html lang="sw">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhatsApp Multi-Device Portal</title>
-    <!-- Maktaba ya kuonyesha QR Code -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-    <!-- Mtindo wa Fonti ya Kisasa -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -22,10 +20,7 @@
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); text-align: center; max-width: 400px; width: 90%;
             animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         h2 { font-weight: 700; margin-bottom: 8px; color: #4ade80; font-size: 24px; }
         p { font-size: 13px; color: #9ca3af; margin-bottom: 25px; }
         .input-group { margin-bottom: 20px; text-align: left; }
@@ -36,18 +31,23 @@
             transition: all 0.3s ease;
         }
         select:focus, input:focus { border-color: #4ade80; box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.15); }
-        button {
+        button.action-btn {
             width: 100%; padding: 14px; background: linear-gradient(135deg, #22c55e, #16a34a);
             color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer;
             box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3); transition: all 0.2s ease;
         }
-        button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4); }
-        button:active { transform: translateY(0); }
+        button.action-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4); }
         .result-container { margin-top: 20px; }
-        .code-box {
-            background: rgba(0, 0, 0, 0.5); padding: 14px; border-radius: 12px; font-size: 20px;
-            font-weight: 700; color: #4ade80; letter-spacing: 3px; border: 1px dashed rgba(74, 222, 128, 0.3); user-select: all;
+        .code-box-wrapper {
+            background: rgba(0, 0, 0, 0.5); padding: 14px; border-radius: 12px;
+            border: 1px dashed rgba(74, 222, 128, 0.3); display: flex; align-items: center; justify-content: space-between;
         }
+        .code-text { font-size: 20px; font-weight: 700; color: #4ade80; letter-spacing: 3px; }
+        .copy-btn {
+            background: #22c55e; color: #fff; border: none; padding: 8px 12px; border-radius: 8px;
+            font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;
+        }
+        .copy-btn:hover { background: #16a34a; }
         canvas { background: #fff; padding: 12px; border-radius: 12px; margin-top: 10px; max-width: 180px; }
         .spinner {
             width: 32px; height: 32px; border: 3px solid rgba(255,255,255,0.1);
@@ -60,22 +60,22 @@
 
 <div class="card">
     <h2>WhatsApp Link</h2>
-    <p>Unganisha namba yako kwa usalama na kwa haraka</p>
+    <p>Connect your WhatsApp account safely & quickly</p>
     
     <div class="input-group">
-        <label>Chagua Njia ya Kuunganisha</label>
+        <label>Select Connection Method</label>
         <select id="method" onchange="toggleInput()">
-            <option value="pair">Pair Code (Namba ya Simu)</option>
+            <option value="pair">Pair Code (Phone Number)</option>
             <option value="qr">QR Code (Scan)</option>
         </select>
     </div>
 
     <div class="input-group" id="phoneGroup">
-        <label>Namba ya Simu (Weka na nchi)</label>
-        <input type="text" id="phoneNumber" placeholder="Mf: 2557XXXXXXXX">
+        <label>Phone Number (Include country code)</label>
+        <input type="text" id="phoneNumber" placeholder="E.g. 2557XXXXXXXX">
     </div>
 
-    <button onclick="generate()">Tengeneza Code</button>
+    <button class="action-btn" onclick="generate()">Generate Code</button>
 
     <div class="spinner" id="loading"></div>
     <div class="result-container" id="resultArea"></div>
@@ -95,43 +95,69 @@
 
         resultArea.innerHTML = "";
         if (method === 'pair' && !phone) { 
-            alert('Tafadhali weka namba ya simu!'); 
+            alert('Please enter your phone number!'); 
             return; 
         }
 
         loading.style.display = 'block';
 
         try {
-            // Hapa ndipo inapounganishwa na Backend yako ya Render
             const BACKEND_URL = 'https://server-h97v.onrender.com/generate';
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 35000);
 
             const response = await fetch(BACKEND_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone, method })
+                body: JSON.stringify({ phone, method }),
+                signal: controller.signal
             });
 
+            clearTimeout(timeoutId);
             const data = await response.json();
             loading.style.display = 'none';
 
             if (method === 'pair') {
                 if (data.code) {
-                    resultArea.innerHTML = `<p style="color:#d1d5db; margin-bottom:6px;">Kodi Yako:</p><div class="code-box">${data.code}</div>`;
+                    resultArea.innerHTML = `
+                        <p style="color:#d1d5db; margin-bottom:6px;">Your Pairing Code:</p>
+                        <div class="code-box-wrapper">
+                            <span class="code-text" id="pairCodeText">${data.code}</span>
+                            <button class="copy-btn" onclick="copyCode()">Copy</button>
+                        </div>
+                    `;
                 } else {
-                    resultArea.innerHTML = `<p style="color: #f87171;">${data.error || 'Imeshindikana!'}</p>`;
+                    resultArea.innerHTML = `<p style="color: #f87171;">${data.error || 'Failed to generate code!'}</p>`;
                 }
             } else if (method === 'qr') {
                 if (data.qr) {
-                    resultArea.innerHTML = `<p style="color:#d1d5db;">Scan QR Code Hii:</p><canvas id="qrCanvas"></canvas>`;
+                    resultArea.innerHTML = `<p style="color:#d1d5db;">Scan this QR Code:</p><canvas id="qrCanvas"></canvas>`;
                     QRCode.toCanvas(document.getElementById('qrCanvas'), data.qr, { width: 170 });
                 } else {
-                    resultArea.innerHTML = `<p style="color: #f87171;">Imeshindikana kupata QR Code.</p>`;
+                    resultArea.innerHTML = `<p style="color: #f87171;">${data.error || 'Failed to generate QR Code.'}</p>`;
                 }
             }
         } catch (err) {
             loading.style.display = 'none';
-            resultArea.innerHTML = `<p style="color: #f87171;">Kosa la mtandao!</p>`;
+            if (err.name === 'AbortError') {
+                resultArea.innerHTML = `<p style="color: #f87171;">Server warming up, please click Generate again!</p>`;
+            } else {
+                resultArea.innerHTML = `<p style="color: #f87171;">Network connection error!</p>`;
+            }
         }
+    }
+
+    function copyCode() {
+        const codeText = document.getElementById('pairCodeText').innerText;
+        navigator.clipboard.writeText(codeText).then(() => {
+            const copyBtn = document.querySelector('.copy-btn');
+            copyBtn.innerText = "Copied!";
+            copyBtn.style.background = "#16a34a";
+            setTimeout(() => { copyBtn.innerText = "Copy"; }, 2000);
+        }).catch(() => {
+            alert('Failed to copy code!');
+        });
     }
 </script>
 
